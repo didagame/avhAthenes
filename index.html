@@ -1584,7 +1584,7 @@ IMGS.sounion="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgk
    La ville (asty) est enfermée dans ses murailles ; au-delà commence la campagne (khôra). */
 var PLAN3D=(function(){
   'use strict';
-  var R,scene,cam,ctl,world,ray,mouse,pins=[],labels=[],box=null,tip=null,actif=false,inited=false,onClic=null,unite=0.001;
+  var R,scene,cam,ctl,world,ACRO=0,pins=[],labels=[],box=null,tip=null,actif=false,inited=false,onClic=null,unite=0.001;
   function ok(){try{if(!window.THREE||!THREE.OrbitControls)return false;var c=document.createElement('canvas');return !!(c.getContext('webgl')||c.getContext('experimental-webgl'));}catch(e){return false;}}
   var KM=100;
   function P(x,y){return [x*KM,-y*KM];}
@@ -1622,7 +1622,7 @@ var PLAN3D=(function(){
   var LONG_N=[[-1.3,-0.15],[-7.5,-2.4]],LONG_S=[[-1.1,-0.375],[-7.15,-2.95]],PHALERE=[[-0.9,-0.6],[-3.6,-4.35]];
   var CORR=[LONG_N[0],LONG_N[1],LONG_S[1],LONG_S[0]];
   var CEPHISE=[[-6.2,24],[-5.0,17],[-4.0,12],[-3.4,8],[-3.0,4.5],[-2.7,1.6],[-2.8,-1.2],[-3.4,-3.2],[-4.1,-4.6]];
-  var ILISSOS=[[5.0,3.4],[3.6,1.6],[2.4,0.1],[1.5,-0.75],[0.5,-1.3],[-0.7,-1.6],[-1.9,-2.3],[-3.0,-3.0],[-3.45,-3.35]];
+  var ILISSOS=[[4.4,1.6],[3.6,1.2],[2.8,0.6],[2.1,-0.1],[1.5,-0.75],[0.5,-1.3],[-0.7,-1.6],[-1.9,-2.3],[-3.0,-3.0],[-3.45,-3.35]];
   function meandre(l,amp,pas){var r=[l[0]];for(var i=0;i<l.length-1;i++){var a=l[i],b=l[i+1],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(2,Math.ceil(L/pas)),nx=-(b[1]-a[1])/L,ny=(b[0]-a[0])/L;
     for(var k=1;k<=n;k++){var f=k/n,x=a[0]+(b[0]-a[0])*f,y=a[1]+(b[1]-a[1])*f,o=(k===n&&i===l.length-2)?0:bruit(x*.9+3.3,y*.9-8.1)*amp+bruit(x*3.1,y*3.1)*amp*.35;r.push([x+nx*o,y+ny*o]);}}return r;}
   var CEPH0=CEPHISE,ILI0=ILISSOS;CEPHISE=meandre(CEPHISE,.55,.08);ILISSOS=meandre(ILISSOS,.3,.06);
@@ -1648,15 +1648,26 @@ var PLAN3D=(function(){
   function surCrete(x,y,c){var best=1e9,hb=0,p=c.p;for(var i=0;i<p.length-1;i++){var a=p[i],b=p[i+1],dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy))),d=Math.hypot(x-a[0]-t*dx,y-a[1]-t*dy);if(d<best){best=d;hb=a[2]+(b[2]-a[2])*t;}}
     var s=best/c.w;if(s>=1)return 0;var q=1-s*s;return hb*q*q*(0.55+0.45*(1-s));}
   var M_DERN=0,DC_DERN=0;
-  function hauteur(x,y){
+  function brut(x,y){
     var dc=distCote(x,y);DC_DERN=dc;
     var wx=x+bruit(x*.3+5.2,y*.3+1.3)*.8,wy=y+bruit(x*.3-7.1,y*.3+9.4)*.8;
     var pl=1.5+Math.min(Math.max(dc,0),5)*1.5+Math.max(0,y)*1.15+fbm(x*.5,y*.5,3)*3.5;if(pl<.8)pl=.8;
     var m=0,i;for(i=0;i<CRETES.length;i++)m+=surCrete(wx,wy,CRETES[i]);
     if(m>0)m*=0.5+0.65*crete(x*.8,y*.8);
     for(i=0;i<BOSSES.length;i++){var b=BOSSES[i],d2=((x-b.x)*(x-b.x)+(y-b.y)*(y-b.y))/(b.r*b.r);if(d2<9)m+=b.h*Math.exp(-d2);}
-    m*=1.5;M_DERN=m;var h=pl+m;
-    var dr=distRiv(x,y);if(dr<.3){var k=1-dr/.3;h-=2.5*k*k;}
+    m*=1.5;M_DERN=m;return pl+m;
+  }
+  /* Lit des rivières : il descend toujours de la source à la mer ; la rivière creuse sa vallée si le relief barre la route. */
+  var LITS=[{l:CEPHISE,c:CEPH0,s:1.6},{l:ILISSOS,c:ILI0,s:1.3}];
+  LITS.forEach(function(r){var b=[],l=r.l;for(var i=0;i<l.length;i++){var hb=brut(l[i][0],l[i][1])-1.6;b.push(i?Math.min(b[i-1]-.03,hb):hb);}r.b=b;});
+  function lit(x,y,h){
+    for(var n=0;n<LITS.length;n++){var r=LITS[n],d0=distLigne(x,y,r.c);if(d0>r.s)continue;
+      var l=r.l,best=1e9,bv=0;for(var i=0;i<l.length-1;i++){var a=l[i],b=l[i+1],dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy))),d=Math.hypot(x-a[0]-t*dx,y-a[1]-t*dy);if(d<best){best=d;bv=r.b[i]+(r.b[i+1]-r.b[i])*t;}}
+      var val=bv+Math.max(0,best-.04)*55,w=lisse(r.s,r.s-.45,d0);if(val<h)h+=(val-h)*w;}
+    return h;
+  }
+  function hauteur(x,y){
+    var i,h=brut(x,y),dc=DC_DERN,m=M_DERN;h=lit(x,y,h);M_DERN=m;DC_DERN=dc;
     var t=lisse(-.25,.4,dc),fond=Math.max(-40,-1.5+Math.min(0,dc)*9);h=fond+(h-fond)*t;
     for(i=0;i<PORTS.length;i++)if(inPoly(x,y,PORTS[i])){h=Math.min(h,-3);break;}
     return h;
@@ -1793,14 +1804,13 @@ var PLAN3D=(function(){
   function etiquette(t,x,y,dh,prio,o){o=o||{};var s=texte(t,o);s.position.copy(v3(x,y,dh));s.userData.prio=prio;s.userData.px=o.px||TAILLES[prio];world.add(s);labels.push(s);return s;}
   function echelles(){var H=box?box.clientHeight:400;unite=2/(H/Math.tan(cam.fov*Math.PI/360));
     labels.forEach(function(s){var h=s.userData.px*unite;s.scale.set(h*s.userData.ratio,h,1);});}
-  var vp=new THREE.Vector3();
+  var vp=window.THREE?new THREE.Vector3():null;
   function ranger(){
     var W=box.clientWidth,H=box.clientHeight,occ=[];
     function ecran(o){vp.copy(o.position).project(cam);return vp.z<1&&vp.z>-1?[(vp.x+1)/2*W,(1-vp.y)/2*H]:null;}
     function libre(r){for(var i=0;i<occ.length;i++){var q=occ[i];if(r[0]<q[2]&&r[2]>q[0]&&r[1]<q[3]&&r[3]>q[1])return false;}return true;}
-    pins.forEach(function(p){var e=ecran(p);if(!e)return;var s=TP*1.1;occ.push([e[0]-s/2,e[1]-s/2,e[0]+s/2,e[1]+s/2]);
-      var l=p.userData.lab;if(l){var h=l.userData.px,w=h*l.userData.ratio*.88;occ.push([e[0]-w/2,e[1]-h*2.25,e[0]+w/2,e[1]-h*1.25]);}});
-    labels.forEach(function(l){if(l.userData.pin)return;var e=ecran(l);if(!e){l.visible=false;return;}
+    pins.forEach(function(p){if(!p.vu)return;occ.push(p.rp,p.rl,p.ra);});
+    labels.forEach(function(l){var e=ecran(l);if(!e){l.visible=false;return;}
       var h=l.userData.px*.62,w=l.userData.px*l.userData.ratio*.86,r=[e[0]-w/2-3,e[1]-h/2-2,e[0]+w/2+3,e[1]+h/2+2];
       if(r[0]<2||r[2]>W-2||r[1]<40||r[3]>H-36){l.visible=false;return;}
       if(libre(r)){occ.push(r);l.visible=true;}else l.visible=false;});
@@ -1872,7 +1882,7 @@ var PLAN3D=(function(){
     /* murailles */
     muraille(MUR,true,4.5);muraille(MUR_PIREE,true,4);muraille(LONG_N,false,4.2);muraille(LONG_S,false,4.2);muraille(PHALERE,false,3.6,'#d9cdb0');
     /* l'Acropole : le rocher, son enceinte, ses temples */
-    var acro=[[-0.17,0.0],[-0.1,0.07],[0.05,0.08],[0.16,0.04],[0.17,-0.03],[0.05,-0.08],[-0.1,-0.07]],base=hM(0,0)-3,sommet=hM(0,0)+15;
+    var acro=[[-0.17,0.0],[-0.1,0.07],[0.05,0.08],[0.16,0.04],[0.17,-0.03],[0.05,-0.08],[-0.1,-0.07]],base=hM(0,0)-3,sommet=hM(0,0)+15;ACRO=sommet;
     var s=new THREE.Shape(acro.map(function(p){var q=P(p[0],p[1]);return new THREE.Vector2(q[0],-q[1]);}));var ge=new THREE.ExtrudeGeometry(s,{depth:sommet-base,bevelEnabled:false});ge.rotateX(-Math.PI/2);
     var roc=new THREE.Mesh(ge,mat('#c9b48a'));roc.position.y=base;roc.castShadow=roc.receiveShadow=true;world.add(roc);
     var ens=new THREE.Group();acro.forEach(function(a,i){var b=acro[(i+1)%acro.length],A=P(a[0],a[1]),B=P(b[0],b[1]);var m=new THREE.Mesh(new THREE.BoxGeometry(1.2,2.4,Math.hypot(B[0]-A[0],B[1]-A[1])+.6),mat('#d8c8a2'));m.position.set((A[0]+B[0])/2,sommet+1.2,(A[1]+B[1])/2);m.rotation.y=Math.atan2(B[0]-A[0],B[1]-A[1]);m.castShadow=true;ens.add(m);});world.add(ens);
@@ -1902,7 +1912,7 @@ var PLAN3D=(function(){
     etiquette('Mont Hymette',6.2,-1.6,16,2,{couleur:C2});etiquette('Mont Aigaléo',-8.8,2.2,14,2,{couleur:C2});
     etiquette('Mont Pentélique · marbre du Parthénon',14.2,9,16,2,{couleur:C2});etiquette('Mont Parnès',0,20.6,16,2,{couleur:C2});
     etiquette('Salamine',-15.6,-2.6,8,3,MER);etiquette('Lycabette',1.55,1.15,10,3,{couleur:C2});
-    etiquette('Céphise',-3.05,5.2,5,3,{couleur:'#e2f2f4',halo:'rgba(28,66,82,.8)'});etiquette('Ilissos',2.9,0.7,5,3,{couleur:'#e2f2f4',halo:'rgba(28,66,82,.8)'});
+    etiquette('Céphise',-3.05,5.2,5,3,{couleur:'#e2f2f4',halo:'rgba(28,66,82,.8)'});etiquette('Ilissos',3.3,1.05,5,3,{couleur:'#e2f2f4',halo:'rgba(28,66,82,.8)'});
     etiquette('Voie sacrée → Éleusis',-11.6,5.0,8,3,{couleur:C2});
     etiquette('Kérameikos (tombes)',-1.75,0.72,6,4,Object.assign({couleur:C2},PETIT));
     VILLAGES.forEach(function(v){etiquette('dème de '+v.nom,v.x,v.y,7,4,PETIT);});
@@ -1911,45 +1921,61 @@ var PLAN3D=(function(){
     ctl=new THREE.OrbitControls(cam,R.domElement);ctl.target.copy(VUE.cible);ctl.enableDamping=true;ctl.dampingFactor=.08;ctl.maxPolarAngle=Math.PI*.42;ctl.minDistance=40;ctl.maxDistance=2600;ctl.screenSpacePanning=false;
     ctl.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};ctl.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
     ctl.update();
-    ray=new THREE.Raycaster();mouse=new THREE.Vector2();
     R.domElement.addEventListener('pointermove',bouge);R.domElement.addEventListener('pointerleave',function(){if(tip)tip.hidden=true;R.domElement.style.cursor='';});
     var dep=null;R.domElement.addEventListener('pointerdown',function(e){dep=[e.clientX,e.clientY];});
-    R.domElement.addEventListener('pointerup',function(e){if(!dep)return;var m=Math.hypot(e.clientX-dep[0],e.clientY-dep[1]);dep=null;if(m>6)return;var p=viser(e);if(p&&p.userData.ouvert&&onClic)onClic(p.userData.k);});
+    R.domElement.addEventListener('pointerup',function(e){if(!dep)return;var m=Math.hypot(e.clientX-dep[0],e.clientY-dep[1]);dep=null;if(m>6)return;var p=viser(e);if(p&&p.ouvert&&onClic)onClic(p.k);});
   }
   var VUE={pos:{x:-330,y:1420,z:1700},cible:{x:-150,y:0,z:150}};
-  function viser(e){var r=R.domElement.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;ray.setFromCamera(mouse,cam);var h=ray.intersectObjects(pins,false);return h.length?h[0].object:null;}
-  function bouge(e){var p=viser(e);R.domElement.style.cursor=p?(p.userData.ouvert?'pointer':'not-allowed'):'';
-    if(tip){if(p){var r=box.getBoundingClientRect();tip.textContent=p.userData.nom+(p.userData.ouvert?'':' · '+p.userData.etatTxt);tip.style.left=(e.clientX-r.left)+'px';tip.style.top=(e.clientY-r.top)+'px';tip.hidden=false;}else tip.hidden=true;}}
-  /* pastilles des lieux */
-  var TP=30;
-  function pinTex(l){
-    var c=document.createElement('canvas');c.width=c.height=128;var x=c.getContext('2d');
+  function viser(e){var r=R.domElement.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+    for(var i=pins.length-1;i>=0;i--){var p=pins[i];if(!p.vu)continue;if(Math.hypot(x-p.cx,y-p.cy)<=TP/2+3||(x>=p.rl[0]&&x<=p.rl[2]&&y>=p.rl[1]&&y<=p.rl[3]))return p;}return null;}
+  function bouge(e){var p=viser(e);R.domElement.style.cursor=p?(p.ouvert?'pointer':'not-allowed'):'';
+    if(tip){if(p){var r=box.getBoundingClientRect();tip.textContent=p.nom+(p.ouvert?'':' · '+p.etatTxt);tip.style.left=(e.clientX-r.left)+'px';tip.style.top=(e.clientY-r.top)+'px';tip.hidden=false;}else tip.hidden=true;}}
+  /* ---- Pastilles des lieux : dessinées à plat sur un calque, reliées au lieu par un trait court et épais ---- */
+  var TP=30,OV=null,OX=null;
+  function pinImg(l){
+    var c=document.createElement('canvas');c.width=c.height=96;var x=c.getContext('2d');
     var fond=l.etat==='fait'?'#3f6a2e':l.etat==='ouvert'?'#d6a243':'#6b5240';
-    x.beginPath();x.moveTo(64,124);x.lineTo(40,82);x.lineTo(88,82);x.closePath();x.fillStyle='#1b120c';x.fill();
-    x.beginPath();x.arc(64,56,46,0,Math.PI*2);x.fillStyle=fond;x.fill();x.lineWidth=7;x.strokeStyle='#1b120c';x.stroke();
-    x.fillStyle=l.etat==='ouvert'?'#1b120c':'#fff4dc';x.font="700 46px 'Marcellus SC', Georgia, serif";x.textAlign='center';x.textBaseline='middle';x.fillText(l.etat==='fait'?'✓':l.lettre,64,59);
-    var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+    x.beginPath();x.arc(48,48,42,0,Math.PI*2);x.fillStyle=fond;x.fill();x.lineWidth=7;x.strokeStyle='#1b120c';x.stroke();
+    x.fillStyle=l.etat==='ouvert'?'#1b120c':'#fff4dc';x.font="700 44px 'Marcellus SC', Georgia, serif";x.textAlign='center';x.textBaseline='middle';x.fillText(l.etat==='fait'?'✓':l.lettre,48,51);
+    return c;
   }
-  var POS={acropole:[0.0,0.02,20,0.55,1.35],pnyx:[-0.62,-0.06,12,-1.1,-1.35],agora:[-0.46,0.4,10,-1.35,1.25],theatre:[0.16,-0.22,10,0.95,-1.15],piree:[-8.05,-3.3,8,-8.05,-3.3]};
+  /* ancre : le lieu (km, hauteur au-dessus du sol) ; décalage de la pastille à l'écran (px) ; côté de l'étiquette */
+  var ANCRE={acropole:[0.03,0.0,-1,20,-36,1],agora:[-0.46,0.4,3,-26,-30,-1],pnyx:[-0.62,-0.06,3,-36,8,-1],theatre:[0.14,-0.2,3,30,14,1],piree:[-8.3,-2.95,2,0,-36,1]};
   function placerPins(lieux){
-    pins.forEach(function(p){world.remove(p);if(p.userData.lab){world.remove(p.userData.lab);labels.splice(labels.indexOf(p.userData.lab),1);}if(p.userData.tige)world.remove(p.userData.tige);});pins=[];
-    lieux.forEach(function(l){var p=POS[l.k];if(!p)return;
-      var haut=Math.max(hM(p[0],p[1]),hM(p[3],p[4]))+p[2]+14,pos=v3(p[3],p[4],0);pos.y=haut;
-      var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:pinTex(l),transparent:true,depthTest:false,sizeAttenuation:false}));sp.renderOrder=9;sp.position.copy(pos);sp.userData={k:l.k,nom:l.nom,ouvert:l.etat==='ouvert',etatTxt:l.etat==='fait'?'déjà visité':'plus tard'};world.add(sp);pins.push(sp);
-      var bas=v3(p[0],p[1],p[0]===0&&p[1]===.02?10:3);
-      var tige=new THREE.Line(new THREE.BufferGeometry().setFromPoints([bas,pos]),new THREE.LineBasicMaterial({color:'#1b120c'}));world.add(tige);sp.userData.tige=tige;
-      var lab=texte(l.court,{font:"700 40px 'Alegreya Sans SC', 'Trebuchet MS', sans-serif"});lab.center.set(0.5,-1.25);lab.renderOrder=8;lab.position.copy(pos);lab.userData.px=18;lab.userData.pin=true;world.add(lab);labels.push(lab);sp.userData.lab=lab;});
-    echelles();
+    pins=[];
+    lieux.forEach(function(l){var a=ANCRE[l.k];if(!a)return;var p=v3(a[0],a[1],a[2]);if(a[2]<0)p.y=ACRO+2;
+      pins.push({k:l.k,nom:l.nom,court:l.court,ouvert:l.etat==='ouvert',etatTxt:l.etat==='fait'?'déjà visité':'plus tard',img:pinImg(l),anc:p,dx:a[3],dy:a[4],cote:a[5],vu:false});});
+  }
+  function calque(t){
+    var W=box.clientWidth,H=box.clientHeight,dpr=Math.min(window.devicePixelRatio||1,2);
+    if(OV.width!==Math.round(W*dpr)||OV.height!==Math.round(H*dpr)){OV.width=Math.round(W*dpr);OV.height=Math.round(H*dpr);}
+    var c=OX;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
+    c.font="700 14px 'Alegreya Sans SC', 'Trebuchet MS', sans-serif";c.textBaseline='middle';c.lineJoin='round';
+    var vis=[];
+    pins.forEach(function(p){vp.copy(p.anc).project(cam);p.vu=false;if(!(vp.z<1&&vp.z>-1))return;p.ax=(vp.x+1)/2*W;p.ay=(1-vp.y)/2*H;p.cx=p.ax+p.dx;p.cy=p.ay+p.dy;vis.push(p);});
+    /* écarter les pastilles qui se chevauchent */
+    for(var it=0;it<8;it++)for(var a=0;a<vis.length;a++)for(var b=a+1;b<vis.length;b++){var P1=vis[a],P2=vis[b],ddx=P2.cx-P1.cx,ddy=P2.cy-P1.cy,d=Math.hypot(ddx,ddy)||1,m=TP+6;
+      if(d<m){var k=(m-d)/2;ddx/=d;ddy/=d;P1.cx-=ddx*k;P1.cy-=ddy*k;P2.cx+=ddx*k;P2.cy+=ddy*k;}}
+    vis.forEach(function(p){var i=pins.indexOf(p),ax=p.ax,ay=p.ay,cx=p.cx,cy=p.cy,vx=cx-ax,vy=cy-ay,L=Math.hypot(vx,vy)||1,r=TP/2;
+      var b=p.ouvert?1+Math.sin(t*.003+i)*.07:1,rr=r*b;
+      /* le trait : liseré clair puis trait sombre épais, du point du lieu au bord de la pastille */
+      var ex=cx-vx/L*rr,ey=cy-vy/L*rr;
+      c.lineCap='round';c.beginPath();c.moveTo(ax,ay);c.lineTo(ex,ey);c.strokeStyle='rgba(255,244,220,.95)';c.lineWidth=6;c.stroke();c.strokeStyle='#1b120c';c.lineWidth=3;c.stroke();
+      c.beginPath();c.arc(ax,ay,4.5,0,7);c.fillStyle='#1b120c';c.fill();c.lineWidth=2;c.strokeStyle='#fff4dc';c.stroke();
+      c.drawImage(p.img,cx-rr,cy-rr,rr*2,rr*2);
+      var tw=c.measureText(p.court).width,tx=p.cote>0?cx+r+5:cx-r-5-tw;
+      c.textAlign='left';c.strokeStyle='rgba(27,18,12,.85)';c.lineWidth=4;c.strokeText(p.court,tx,cy);c.fillStyle='#fff4dc';c.fillText(p.court,tx,cy);
+      p.vu=true;p.rp=[cx-r-2,cy-r-2,cx+r+2,cy+r+2];p.rl=[tx-3,cy-10,tx+tw+3,cy+10];p.ra=[Math.min(ax,cx)-4,Math.min(ay,cy)-4,Math.max(ax,cx)+4,Math.max(ay,cy)+4];});
   }
   function taille(){if(!box||!R)return;var w=box.clientWidth,h=box.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();echelles();}
   var tRang=0;
   function boucle(t){if(!actif)return;if(!R.domElement.isConnected){actif=false;return;}
-    var k=t*0.003;pins.forEach(function(p,i){var b=p.userData.ouvert?1+Math.sin(k+i)*0.08:1,s=TP*unite*b;p.scale.set(s,s,1);});
     ctl.update();
     ctl.target.x=Math.max(-1500,Math.min(1500,ctl.target.x));ctl.target.z=Math.max(-2000,Math.min(1200,ctl.target.z));ctl.target.y=Math.max(0,Math.min(60,ctl.target.y));
     if(t-tRang>120){ranger();tRang=t;}
-    R.render(scene,cam);requestAnimationFrame(boucle);}
+    R.render(scene,cam);calque(t);requestAnimationFrame(boucle);}
   function lancer(el,lieux){box=el;el.insertBefore(R.domElement,el.firstChild);R.domElement.setAttribute('aria-hidden','true');
+    if(!OV){OV=document.createElement('canvas');OV.setAttribute('aria-hidden','true');OV.style.cssText='position:absolute;left:0;top:0;pointer-events:none';OX=OV.getContext('2d');}el.insertBefore(OV,R.domElement.nextSibling);
     placerPins(lieux);taille();tRang=0;actif=true;requestAnimationFrame(boucle);}
   function monter(el,lieux,clic,bulle){
     if(!ok())return false;tip=bulle;onClic=clic;box=el;
@@ -2462,16 +2488,16 @@ function lieuFait(k){var L=C.plan.lieux[k];return !!(L.fin&&S.vus[L.fin]);}
 function rendrePlan(){
   var P=C.plan,el=$('scene');
   var svg='<svg class="peinture" viewBox="0 0 400 300" role="img" aria-label="Plan d\'Athènes et du Pirée">'+
-  '<rect width="400" height="300" rx="14" fill="#122029"/>'+
+  '<rect width="400" height="300" rx="14" fill="#1b4258"/>'+'<g fill="none" stroke="#9cc4d4" stroke-opacity=".35" stroke-width="1.3" stroke-linecap="round"><path d="M30 70 q8 -5 16 0 q8 5 16 0"/><path d="M120 40 q8 -5 16 0 q8 5 16 0"/><path d="M60 140 q8 -5 16 0 q8 5 16 0"/><path d="M200 60 q8 -5 16 0 q8 5 16 0"/><path d="M20 180 q8 -5 16 0 q8 5 16 0"/><path d="M150 100 q8 -5 16 0 q8 5 16 0"/></g>'+
   '<path d="M0 300 L0 210 C40 200 60 230 90 214 C120 196 140 150 200 120 C250 90 300 40 400 30 L400 300 Z" fill="'+TC+'"/>'+
   '<path d="M0 210 C40 200 60 230 90 214 C120 196 140 150 200 120 C250 90 300 40 400 30" fill="none" stroke="'+TC2+'" stroke-width="1.5"/>'+
-  '<path d="M60 222 q14 -18 34 -10 q10 14 -8 22 q-16 6 -26 -12z" fill="#122029"/>'+dauphin(14,262,.5,'3s','0s')+
+  '<path d="M60 222 q14 -18 34 -10 q10 14 -8 22 q-16 6 -26 -12z" fill="#1b4258"/>'+dauphin(70,112,.5,'3s','0s')+
   '<g stroke="'+LN+'" stroke-width="3" fill="none"><path d="M96 214 L268 112 M84 236 L276 132"/></g>'+
   '<text x="170" y="164" font-family="Alegreya Sans SC,sans-serif" font-size="10" fill="'+LN+'" transform="rotate(-31 170 164)">Longs Murs</text>'+
   '<circle cx="305" cy="112" r="66" fill="none" stroke="'+LN+'" stroke-width="3"/>'+
   '<path d="M318 106 q22 -16 40 0 q-4 18 -40 12z" fill="'+TC2+'" stroke="'+LN+'"/>'+
-  '<text x="30" y="290" font-family="Marcellus SC,serif" font-size="13" fill="'+TC2+'">Mer Égée</text>'+
-  '<text x="336" y="196" font-family="Marcellus SC,serif" font-size="12" fill="'+LN+'">ATHÈNES</text>'+vol(40,'22s',3);
+  '<text x="26" y="34" font-family="Marcellus SC,serif" font-size="13" fill="#d6e8ef">Mer Égée · golfe Saronique</text>'+
+  '<text x="336" y="196" font-family="Marcellus SC,serif" font-size="12" fill="'+LN+'">ATHÈNES</text>';
   var pts={acropole:[340,112],pnyx:[268,126],agora:[312,70],theatre:[352,140],piree:[78,222]};
   var noms={acropole:'Acropole',pnyx:'Pnyx',agora:'Agora',theatre:'Théâtre',piree:'Pirée'};
   Object.keys(pts).forEach(function(k){
