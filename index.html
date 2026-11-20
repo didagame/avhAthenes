@@ -7,6 +7,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style id="gt-base">html{font-size:calc(100% * var(--et,1))}html.grand-texte{--et:1.25}</style>
+<script>try{if(localStorage.getItem("jeux-grand-texte")==="1")document.documentElement.classList.add("grand-texte");}catch(e){}</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&family=Marcellus+SC&display=swap">
 
 
@@ -1044,7 +1046,7 @@ var CONTENU = {
   --f-titre:'Marcellus SC','Trajan Pro',Georgia,serif;
   --f-texte:'Alegreya',Georgia,'Times New Roman',serif;
   --f-etiquette:'Alegreya Sans SC','Gill Sans','Trebuchet MS',sans-serif;
-  --taille:clamp(14.5px,2.35vh,18px);
+  --taille:clamp(calc(14.5px * var(--et,1)),calc(2.35vh * var(--et,1)),calc(18px * var(--et,1)));
   --meandre:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 1H16M0 15H16M2 15V4H13V12H6V7H10' fill='none' stroke='%23c8663a' stroke-width='1.5'/%3E%3C/svg%3E");
   color-scheme:light;
 }
@@ -1135,7 +1137,7 @@ h2.lieu::after{content:"";display:block;height:10px;margin-top:6px;background:ur
 .tourne span{font-family:var(--f-etiquette);color:var(--terre-claire);letter-spacing:.1em;font-size:.85rem}
 .vase-face{transition:opacity .35s,transform .35s}
 .vase-face.cache{opacity:0;transform:scaleX(.6)}
-.titre-jeu{font-family:var(--f-titre);font-weight:400;font-size:clamp(2rem,6vh,3.1rem);line-height:1;margin:0;color:var(--encre);text-wrap:balance}
+.titre-jeu{font-family:var(--f-titre);font-weight:400;font-size:clamp(2rem,calc(6vh * var(--et,1)),3.1rem);line-height:1;margin:0;color:var(--encre);text-wrap:balance}
 .sous-titre{font-style:italic;color:var(--terre);margin:.2em 0 .6em;font-size:1.08rem}
 .fiche-heros{border:1px solid var(--papyrus-ombre);border-radius:12px;background:rgba(255,250,238,.5);padding:10px 14px;margin:0 0 .7em}
 .fiche-heros h3{font-family:var(--f-titre);font-weight:400;font-size:1.35rem;margin:0;color:var(--encre)}
@@ -1377,7 +1379,7 @@ h2.lieu::after{content:"";display:block;height:10px;margin-top:6px;background:ur
 .jetons .db li{background:rgba(214,162,67,.18)}
 .jetons .db h4{color:#8a6420}
 .jetons.trois{grid-template-columns:repeat(3,minmax(0,1fr))}
-.fin-titre{font-family:var(--f-titre);font-weight:400;font-size:clamp(1.8rem,5vh,2.6rem);margin:0;line-height:1.05;color:var(--encre)}
+.fin-titre{font-family:var(--f-titre);font-weight:400;font-size:clamp(1.8rem,calc(5vh * var(--et,1)),2.6rem);margin:0;line-height:1.05;color:var(--encre)}
 @media (max-width:899px),(max-height:479px){
   .accueil,.pop-grid,.urne-zone,.plaid,.ostra-zone{grid-template-columns:minmax(0,1fr)}
   .visages{grid-template-columns:minmax(0,1fr)}
@@ -3182,5 +3184,30 @@ majMusique();rendre();
 })();
 </script>
 
+
+<!-- Bouton « Grandes lettres » : agrandit tous les textes de 25 % ; le choix est gardé d'une visite et d'un jeu à l'autre -->
+<style id="gt-style">
+#gt-btn{position:fixed;z-index:2147483000;left:12px;bottom:12px;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border-radius:999px;border:2px solid #1d2230;background:#fffdf7;color:#1d2230;font:700 15px/1.1 "Atkinson Hyperlegible",Verdana,Arial,sans-serif;letter-spacing:0;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.28)}
+#gt-btn:hover{background:#efe9da}
+#gt-btn[aria-pressed="true"]{background:#1d2230;color:#fff}
+#gt-btn:focus-visible{outline:3px solid #2747a8;outline-offset:2px}
+#gt-btn b{font-size:17px}
+@media print{#gt-btn{display:none}}
+</style>
+<button type="button" id="gt-btn" aria-pressed="false" title="Agrandir les lettres de tous les textes"><b aria-hidden="true">A+</b> Grandes lettres</button>
+<script>
+(function(){
+  var r=document.documentElement,b=document.getElementById("gt-btn");
+  function maj(){b.setAttribute("aria-pressed",r.classList.contains("grand-texte")?"true":"false");}
+  maj();
+  b.addEventListener("click",function(){
+    var on=!r.classList.contains("grand-texte");
+    r.classList.toggle("grand-texte",on);
+    try{localStorage.setItem("jeux-grand-texte",on?"1":"0");}catch(e){}
+    maj();
+    try{window.dispatchEvent(new Event("resize"));}catch(e){}
+  });
+})();
+</script>
 </body>
 </html>
